@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptions } from '@nestjs/swagger';
 import { Expose, Transform } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, ValidateIf } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, Equals, IsArray, ValidateIf } from 'class-validator';
 
 export type PropertyOptions<T, CustomOptions = Record<string, never>> = BasePropertyOptions &
   CustomOptions &
@@ -16,12 +16,16 @@ export type BasePropertyOptions = {
 export type SingularPropertyOptions<T> = {
   example?: T;
   default?: T;
+  constant?: T;
   isArray?: undefined;
 };
+
+export type EachItem<T> = { each: true; value: T };
 
 export type ArrayPropertyOptions<T> = {
   example?: T[];
   default?: T[];
+  constant?: T[] | EachItem<T>;
   isArray: true | { minLength?: number; maxLength?: number; length?: number };
 };
 
@@ -37,6 +41,7 @@ export const compose = <T, CustomOptions>(
     description,
     default: def,
     name,
+    constant,
   }: PropertyOptions<T, CustomOptions>,
   ...decorators: PropertyDecorator[]
 ): PropertyDecorator => {
@@ -54,8 +59,14 @@ export const compose = <T, CustomOptions>(
     minLength ? ArrayMinSize(minLength) : noop,
     maxLength ? ArrayMaxSize(maxLength) : noop,
     def !== undefined ? Transform(({ value }) => (value === undefined ? def : value)) : noop,
+    constant
+      ? Equals((constant as EachItem<T>).value ?? constant, {
+          each: (constant as EachItem<T>).each ?? false,
+        })
+      : noop,
     ApiProperty({
       ...apiPropertyOptions,
+      ...(constant !== undefined && { enum: [constant] }),
       minItems: minLength,
       maxItems: maxLength,
       ...(nullable && { nullable }),

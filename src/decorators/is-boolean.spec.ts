@@ -135,4 +135,57 @@ describe('IsBoolean', () => {
       expect(await input(Test, {})).toStrictEqual(Result.ok(make(Test, {})));
     });
   });
+
+  describe('constant', () => {
+    class Test {
+      @IsBoolean({ constant: false })
+      constantBooleanField!: false;
+    }
+
+    it('generates correct schema', async () => {
+      expect(await generateSchemas([Test])).toStrictEqual({
+        Test: {
+          type: 'object',
+          properties: {
+            constantBooleanField: {
+              type: 'boolean',
+              enum: [false],
+            },
+          },
+          required: ['constantBooleanField'],
+        },
+      });
+    });
+
+    it('accepts only specified constant', async () => {
+      expect(await input(Test, { constantBooleanField: false })).toStrictEqual(
+        Result.ok(make(Test, { constantBooleanField: false }))
+      );
+    });
+
+    it('transforms to plain', async () => {
+      const dto = make(Test, { constantBooleanField: false });
+      expect(output(dto)).toStrictEqual({ constantBooleanField: false });
+    });
+
+    it('rejects everything else', async () => {
+      const testValues: unknown[] = [
+        { constantBooleanField: true },
+        { constantBooleanField: 'true' },
+        { constantBooleanField: 'false' },
+        { constantBooleanField: 'abc' },
+        { constantBooleanField: 0 },
+        { constantBooleanField: [] },
+        { constantBooleanField: {} },
+        { constantBooleanField: null },
+        {},
+      ];
+
+      for (const testValue of testValues) {
+        expect(await input(Test, testValue)).toStrictEqual(
+          Result.err('constantBooleanField must be a boolean value')
+        );
+      }
+    });
+  });
 });
